@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>期权定价计算器</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --card: #1c2733;
+    --border: #2f3e50;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  
+  h1 {
+    text-align: center;
+    font-size: 1.4em;
+    margin-bottom: 8px;
+    color: var(--blue);
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8em;
+    margin-bottom: 24px;
+  }
+  
+  /* Tab bar */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .tab {
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .tab.active {
+    background: var(--blue);
+    color: #fff;
+    border-color: var(--blue);
+  }
+  .tab:hover:not(.active) {
+    border-color: var(--blue);
+    color: var(--blue);
+  }
+  
+  .panel { display: none; }
+  .panel.active { display: block; }
+  
+  /* Calculator card */
+  .calc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 600px) {
+    .calc-grid { grid-template-columns: 1fr; }
+  }
+  
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 0.75em;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+  }
+  
+  .input-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+  .input-row label {
+    font-size: 0.85em;
+    color: var(--muted);
+    min-width: 100px;
+  }
+  .input-row input, .input-row select {
+    flex: 1;
+    max-width: 120px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 10px;
+    font-size: 0.9em;
+    text-align: right;
+    font-family: 'Courier New', monospace;
+  }
+  .input-row select {
+    text-align: left;
+    cursor: pointer;
+  }
+  .input-row input:focus, .input-row select:focus {
+    outline: none;
+    border-color: var(--blue);
+  }
+  .unit {
+    font-size: 0.8em;
+    color: var(--muted);
+    min-width: 20px;
+  }
+  
+  /* Quick fill buttons */
+  .quick-btns {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .quick-btn {
+    padding: 4px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    font-size: 0.75em;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .quick-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .quick-btn.active { border-color: var(--green); color: var(--green); }
+  
+  /* Results */
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .result-box {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .result-label {
+    font-size: 0.7em;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .result-value {
+    font-size: 1.4em;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+  }
+  .result-value.green { color: var(--green); }
+  .result-value.red { color: var(--red); }
+  .result-value.blue { color: var(--blue); }
+  .result-value.yellow { color: var(--yellow); }
+  .result-value.purple { color: var(--purple); }
+  
+  .result-note {
+    font-size: 0.65em;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  
+  /* Option price display */
+  .price-display {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .price-display .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .price-display .row:last-child { border-bottom: none; }
+  .price-display .row .label { color: var(--muted); font-size: 0.85em; }
+  .price-display .row .val {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 0.95em;
+  }
+  .price-display .row .val.b { font-size: 1.1em; }
+  
+  /* Greeks bar */
+  .greeks-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  .greek-chip {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    text-align: center;
+    flex: 1;
+    min-width: 70px;
+  }
+  .greek-chip .g { font-size: 0.65em; color: var(--muted); }
+  .greek-chip .v { font-size: 1.1em; font-weight: 700; font-family: 'Courier New', monospace; }
+  
+  /* Sensitivity table */
+  .sensitivity {
+    margin-top: 16px;
+  }
+  .sens-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8em;
+    margin-top: 8px;
+  }
+  .sens-table th {
+    background: var(--bg);
+    color: var(--muted);
+    padding: 6px 8px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .sens-table td {
+    padding: 5px 8px;
+    text-align: center;
+    border: 1px solid var(--border);
+    font-family: 'Courier New', monospace;
+  }
+  .sens-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+  .sens-table td.highlight { background: rgba(88, 166, 255, 0.1); color: var(--blue); font-weight: 700; }
+  
+  /* P&L heatmap */
+  .pnl-bar {
+    margin-top: 12px;
+  }
+  .pnl-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .pnl-track {
+    height: 24px;
+    background: linear-gradient(to right, var(--red), #333 50%, var(--green));
+    border-radius: 4px;
+    position: relative;
+  }
+  .pnl-marker {
+    position: absolute;
+    top: -4px;
+    width: 3px;
+    height: 32px;
+    background: #fff;
+    border-radius: 2px;
+    transform: translateX(-50%);
+  }
+  .pnl-marker::after {
+    content: attr(data-val);
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7em;
+    color: #fff;
+    white-space: nowrap;
+  }
+  
+  /* Info box */
+  .info-box {
+    background: rgba(88, 166, 255, 0.08);
+    border: 1px solid rgba(88, 166, 255, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.8em;
+    color: var(--muted);
+    margin-top: 16px;
+  }
+  
+  .btn-calc {
+    width: 100%;
+    padding: 12px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: opacity 0.2s;
+  }
+  .btn-calc:hover { opacity: 0.85; }
+  
+  /* Quick strategies */
+  .strategy-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 600px) {
+    .strategy-grid { grid-template-columns: 1fr; }
+  }
+  .strategy-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .strategy-card:hover {
+    border-color: var(--blue);
+    transform: translateY(-1px);
+  }
+  .strategy-card.active {
+    border-color: var(--green);
+    background: rgba(63, 185, 80, 0.05);
+  }
+  .strategy-name {
+    font-weight: 600;
+    font-size: 0.9em;
+    margin-bottom: 4px;
+  }
+  .strategy-desc {
+    font-size: 0.75em;
+    color: var(--muted);
+  }
+  .strategy-legs {
+    font-size: 0.7em;
+    color: var(--blue);
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 期权定价计算器</h1>
+  <p class="subtitle">Black-Scholes 模型 | IV反推 | Greeks计算 | 盈亏敏感性</p>
+  
+  <div class="tabs">
+    <div class="tab active" data-tab="single">单腿定价</div>
+    <div class="tab" data-tab="strategy">策略组合</div>
+    <div class="tab" data-tab="sensitivity">全量敏感</div>
+  </div>
+  
+  <!-- ========== 单腿计算器 ========== -->
+  <div id="panel-single" class="panel active">
+    <div class="card">
+      <div class="card-title">📥 输入参数</div>
+      
+      <div class="input-row">
+        <label>标的</label>
+        <select id="ticker" onchange="applyTickerPreset()">
+          <option value="AMD">AMD</option>
+          <option value="AMZN">AMZN</option>
+          <option value="GOOGL">GOOGL</option>
+          <option value="UNH">UNH</option>
+          <option value="TSLA">TSLA</option>
+          <option value="AAPL">AAPL</option>
+          <option value="NVDA">NVDA</option>
+          <option value="MSFT">MSFT</option>
+          <option value="META">META</option>
+          <option value="CUSTOM">自定义</option>
+        </select>
+      </div>
+      
+      <div class="input-row">
+        <label>期权类型</label>
+        <select id="optType">
+          <option value="call">Call (看涨)</option>
+          <option value="put">Put (看跌)</option>
+        </select>
+      </div>
+      
+      <div class="input-row">
+        <label>方向</label>
+        <select id="direction">
+          <option value="Long">Long (买入)</option>
+          <option value="Short">Short (卖出)</option>
+        </select>
+      </div>
+      
+      <div class="input-row">
+        <label>正股现价</label>
+        <input type="number" id="S" value="424.13" step="0.01" min="0">
+        <span class="unit">USD</span>
+      </div>
+      
+      <div class="input-row">
+        <label>Strike</label>
+        <input type="number" id="K" value="400" step="1" min="0">
+        <span class="unit">USD</span>
+      </div>
+      
+      <div class="input-row">
+        <label>到期日</label>
+        <input type="date" id="expDate" value="2027-01-15">
+      </div>
+      
+      <div class="input-row">
+        <label>IV (隐含波动率)</label>
+        <input type="number" id="sigma" value="52" step="0.1" min="0" max="200">
+        <span class="unit">%</span>
+      </div>
+      
+      <div class="input-row">
+        <label>无风险利率</label>
+        <input type="number" id="r" value="4.5" step="0.1" min="0" max="20">
+        <span class="unit">%</span>
+      </div>
+      
+      <div class="input-row">
+        <label>你的成本价</label>
+        <input type="number" id="cost" value="10" step="0.01" min="0">
+        <span class="unit">USD</span>
+      </div>
+      
+      <div class="card-title" style="margin-top: 16px;">⚡ 快速设置（正股心理价位）</div>
+      <div class="quick-btns" id="quickPrices">
+        <button class="quick-btn" data-val="380">$380</button>
+        <button class="quick-btn" data-val="400">$400</button>
+        <button class="quick-btn active" data-val="424">$424</button>
+        <button class="quick-btn" data-val="450">$450</button>
+        <button class="quick-btn" data-val="470">$470</button>
+        <button class="quick-btn" data-val="500">$500</button>
+      </div>
+      <div class="input-row" style="margin-top: 8px;">
+        <label>自定义价位</label>
+        <input type="number" id="customPrice" placeholder="输入正股目标价" step="1">
+        <button class="quick-btn" onclick="applyCustomPrice()" style="margin-left: 4px;">→</button>
+      </div>
+      
+      <button class="btn-calc" onclick="calculate()">🧮 计算期权价格</button>
+    </div>
+    
+    <!-- 结果 -->
+    <div class="card" id="resultCard" style="display:none;">
+      <div class="card-title">📈 计算结果</div>
+      
+      <div class="result-grid">
+        <div class="result-box">
+          <div class="result-label">期权理论价</div>
+          <div class="result-value blue" id="resPrice">--</div>
+          <div class="result-note" id="resMoneyness">--</div>
+        </div>
+        <div class="result-box">
+          <div class="result-label">你的浮盈亏</div>
+          <div class="result-value" id="resPnl">--</div>
+          <div class="result-note" id="resPnlPct">--</div>
+        </div>
+      </div>
+      
+      <div class="greeks-bar">
+        <div class="greek-chip">
+          <div class="g">Delta</div>
+          <div class="v" id="gDelta">--</div>
+        </div>
+        <div class="greek-chip">
+          <div class="g">Gamma</div>
+          <div class="v" id="gGamma">--</div>
+        </div>
+        <div class="greek-chip">
+          <div class="g">Theta/日</div>
+          <div class="v" id="gTheta">--</div>
+        </div>
+        <div class="greek-chip">
+          <div class="g">Vega</div>
+          <div class="v" id="gVega">--</div>
+        </div>
+      </div>
+      
+      <div class="price-display">
+        <div class="row"><span class="label">d1</span><span class="val" id="rd1">--</span></div>
+        <div class="row"><span class="label">d2</span><span class="val" id="rd2">--</span></div>
+        <div class="row"><span class="label">N(d1)</span><span class="val" id="rnd1">--</span></div>
+        <div class="row"><span class="label">N(d2)</span><span class="val" id="rnd2">--</span></div>
+        <div class="row"><span class="label">到期天数</span><span class="val" id="rdays">--</span></div>
+      </div>
+      
+      <div class="pnl-bar">
+        <div class="pnl-bar-label">
+          <span>亏损</span>
+          <span id="pnlRangeLabel">成本 $10 → 盈亏区间</span>
+          <span>盈利</span>
+        </div>
+        <div class="pnl-track">
+          <div class="pnl-marker" id="pnlMarker" style="left: 50%;" data-val="成本"></div>
+        </div>
+      </div>
+      
+      <div class="info-box" id="resAdvice">
+        输入参数后点击计算
+      </div>
+    </div>
+    
+    <!-- 敏感性分析表 -->
+    <div class="card" id="sensCard" style="display:none;">
+      <div class="card-title">📊 正股价格敏感性分析</div>
+      <table class="sens-table" id="sensTable">
+        <thead><tr>
+          <th>正股价</th><th>期权价</th><th>浮盈亏</th><th>Delta</th><th>状态</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- ========== 策略组合 ========== -->
+  <div id="panel-strategy" class="panel">
+    <div class="card">
+      <div class="card-title">📋 快速策略</div>
+      <div class="strategy-grid">
+        <div class="strategy-card" onclick="loadStrategy('longCall')">
+          <div class="strategy-name">Long Call</div>
+          <div class="strategy-desc">低门槛看多，损失有限</div>
+          <div class="strategy-legs">买1张Call</div>
+        </div>
+        <div class="strategy-card" onclick="loadStrategy('shortPut')">
+          <div class="strategy-name">Short Put</div>
+          <div class="strategy-desc">收权利金，抄底神器</div>
+          <div class="strategy-legs">卖1张Put</div>
+        </div>
+        <div class="strategy-card" onclick="loadStrategy('coveredCall')">
+          <div class="strategy-name">Covered Call</div>
+          <div class="strategy-desc">持股收租，上涨有限</div>
+          <div class="strategy-legs">持股+卖Call</div>
+        </div>
+        <div class="strategy-card" onclick="loadStrategy('bullCall')">
+          <div class="strategy-name">Bull Call Spread</div>
+          <div class="strategy-desc">低成本看多，锁定上限</div>
+          <div class="strategy-legs">买低Strike Call + 卖高Strike Call</div>
+        </div>
+        <div class="strategy-card" onclick="loadStrategy('protectivePut')">
+          <div class="strategy-name">Protective Put</div>
+          <div class="strategy-desc">持股保险，下跌保护</div>
+          <div class="strategy-legs">持股+买Put</div>
+        </div>
+        <div class="strategy-card" onclick="loadStrategy('ironCondor')">
+          <div class="strategy-name">Iron Condor</div>
+          <div class="strategy-desc">赚区间震荡Theta</div>
+          <div class="strategy-legs">4腿组合</div>
+        </div>
+      </div>
+      
+      <div class="card-title">📥 组合参数</div>
+      <div class="input-row">
+        <label>正股现价</label>
+        <input type="number" id="S2" value="424" step="1">
+        <span class="unit">USD</span>
+      </div>
+      <div class="input-row">
+        <label>IV</label>
+        <input type="number" id="sigma2" value="52" step="0.1">
+        <span class="unit">%</span>
+      </div>
+      <div class="input-row">
+        <label>距到期</label>
+        <input type="number" id="dte2" value="30" min="1" max="730">
+        <span class="unit">天</span>
+      </div>
+      
+      <button class="btn-calc" onclick="calcStrategy()">🧮 计算策略盈亏</button>
+    </div>
+    
+    <div class="card" id="strategyResult" style="display:none;">
+      <div class="card-title">📊 策略分析</div>
+      <div class="result-grid">
+        <div class="result-box">
+          <div class="result-label">最大盈利</div>
+          <div class="result-value green" id="strMaxProfit">--</div>
+        </div>
+        <div class="result-box">
+          <div class="result-label">最大亏损</div>
+          <div class="result-value red" id="strMaxLoss">--</div>
+        </div>
+        <div class="result-box">
+          <div class="result-label">盈亏平衡点</div>
+          <div class="result-value yellow" id="strBep">--</div>
+        </div>
+        <div class="result-box">
+          <div class="result-label">最大盈利/亏损比</div>
+          <div class="result-value purple" id="strRatio">--</div>
+        </div>
+      </div>
+      <table class="sens-table" style="margin-top: 16px;">
+        <thead><tr><th>正股价</th><th>策略盈亏</th><th>收益率</th></tr></thead>
+        <tbody id="strTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- ========== 全量敏感分析 ========== -->
+  <div id="panel-sensitivity" class="panel">
+    <div class="card">
+      <div class="card-title">📥 输入（你的AMD仓位为例）</div>
+      <div class="input-row">
+        <label>正股现价</label>
+        <input type="number" id="S3" value="424" step="1">
+        <span class="unit">USD</span>
+      </div>
+      <div class="input-row">
+        <label>Strike</label>
+        <input type="number" id="K3" value="400" step="1">
+        <span class="unit">USD</span>
+      </div>
+      <div class="input-row">
+        <label>期权类型</label>
+        <select id="optType3">
+          <option value="call">Call</option>
+          <option value="put">Put</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <label>IV</label>
+        <input type="number" id="sigma3" value="52" step="0.1">
+        <span class="unit">%</span>
+      </div>
+      <div class="input-row">
+        <label>到期天数</label>
+        <input type="number" id="dte3" value="240" min="1">
+        <span class="unit">天</span>
+      </div>
+      <div class="input-row">
+        <label>方向</label>
+        <select id="direction3">
+          <option value="Long">Long</option>
+          <option value="Short">Short</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <label>成本价</label>
+        <input type="number" id="cost3" value="10" step="0.01">
+        <span class="unit">USD</span>
+      </div>
+      
+      <button class="btn-calc" onclick="calcSensitivity()">🧮 生成敏感性矩阵</button>
+    </div>
+    
+    <div class="card" id="sensResult" style="display:none;">
+      <div class="card-title">📊 价格 × IV 敏感性矩阵（期权价格）</div>
+      <div id="sensMatrix"></div>
+      <div class="card-title" style="margin-top: 20px;">📊 价格 × IV 敏感性矩阵（浮盈亏）</div>
+      <div id="sensPnlMatrix"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Black-Scholes Engine ==========
+function normCDF(x) {
+  // Approximation of N(0,1) CDF, max error ~1.5e-7
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x);
+  const t = 1 / (1 + p * x);
+  const y = 1 - sign * (a1*t + a2*t*t + a3*t*t*t + a4*t*t*t*t + a5*t*t*t*t*t) * Math.exp(-x*x/2);
+  return 0.5 * (1 + sign * y);
+}
+
+function blackScholes(S, K, T, r, sigma, optType) {
+  if (T <= 0) {
+    const intrinsic = optType === 'call' ? Math.max(S - K, 0) : Math.max(K - S, 0);
+    const delta = optType === 'call' ? (S > K ? 1 : 0) : (S < K ? -1 : 0);
+    return { price: intrinsic, delta, gamma: 0, vega: 0, theta: 0, d1: 0, d2: 0 };
+  }
+  const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+  const nd1 = normCDF(d1);
+  const nd2 = normCDF(d2);
+  const nnd1 = normCDF(-d1);
+  const nnd2 = normCDF(-d2);
+  
+  let price, delta;
+  if (optType === 'call') {
+    price = S * nd1 - K * Math.exp(-r * T) * nd2;
+    delta = nd1;
+  } else {
+    price = K * Math.exp(-r * T) * nnd2 - S * nnd1;
+    delta = nd1 - 1;
+  }
+  
+  const gamma = normCDF(Math.abs(d1)) / (S * sigma * Math.sqrt(T));
+  const vega = S * normCDF(Math.abs(d1)) * Math.sqrt(T) / 100; // per 1% IV
+  const theta = (-(S * normCDF(Math.abs(d1)) * sigma) / (2 * Math.sqrt(T)) 
+                 - r * K * Math.exp(-r * T) * (optType === 'call' ? nd2 : nnd2)) / 365;
+  
+  return { price, delta, gamma, vega, theta, d1, d2 };
+}
+
+function bsCall(S, K, T, r, sigma) { return blackScholes(S, K, T, r, sigma, 'call').price; }
+function bsPut(S, K, T, r, sigma) { return blackScholes(S, K, T, r, sigma, 'put').price; }
+
+function getT(expDate) {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const exp = new Date(expDate);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.max((exp - today) / (msPerDay * 365), 0);
+}
+
+function fmt(n, d = 2) { return typeof n === 'number' ? n.toFixed(d) : '--'; }
+function fmt$(n, d = 2) { return '$' + fmt(n, d); }
+
+// ========== Tab switching ==========
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+  });
+});
+
+// ========== Ticker presets ==========
+const presets = {
+  AMD:   { sigma: 52, S: 424 },
+  AMZN:  { sigma: 38, S: 264 },
+  GOOGL: { sigma: 35, S: 434 },
+  UNH:   { sigma: 28, S: 395 },
+  TSLA:  { sigma: 65, S: 340 },
+  AAPL:  { sigma: 28, S: 220 },
+  NVDA:  { sigma: 60, S: 470 },
+  META:  { sigma: 42, S: 490 },
+};
+
+function applyTickerPreset() {
+  const t = document.getElementById('ticker').value;
+  if (presets[t]) {
+    document.getElementById('S').value = presets[t].S;
+    document.getElementById('sigma').value = presets[t].sigma;
+  }
+  calculate();
+}
+
+// ========== Quick price buttons ==========
+document.querySelectorAll('.quick-btn[data-val]').forEach(btn => {
+  if (!btn.onclick) {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.quick-btn[data-val]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('S').value = btn.dataset.val;
+      calculate();
+    });
+  }
+});
+
+function applyCustomPrice() {
+  const v = parseFloat(document.getElementById('customPrice').value);
+  if (!isNaN(v) && v > 0) {
+    document.getElementById('S').value = v;
+    document.querySelectorAll('.quick-btn[data-val]').forEach(b => b.classList.remove('active'));
+    calculate();
+  }
+}
+
+// ========== Main calculation ==========
+function calculate() {
+  const S = parseFloat(document.getElementById('S').value);
+  const K = parseFloat(document.getElementById('K').value);
+  const expDate = document.getElementById('expDate').value;
+  const sigma = parseFloat(document.getElementById('sigma').value) / 100;
+  const r = parseFloat(document.getElementById('r').value) / 100;
+  const cost = parseFloat(document.getElementById('cost').value);
+  const optType = document.getElementById('optType').value;
+  const direction = document.getElementById('direction').value;
+  
+  const T = getT(expDate);
+  const days = Math.round(T * 365);
+  const result = blackScholes(S, K, T, r, sigma, optType);
+  
+  // P&L
+  const qty = direction === 'Long' ? 1 : -1;
+  const pnl = (result.price - cost) * qty * 100;
+  const pnlPct = cost > 0 ? (result.price - cost) / cost * 100 * qty : 0;
+  
+  // Moneyness
+  const itm = optType === 'call' ? (S > K ? 'ITM' : S < K ? 'OTM' : 'ATM') 
+                         : (S < K ? 'ITM' : S > K ? 'OTM' : 'ATM');
+  const moneyness = optType === 'call' 
+    ? ((S / K - 1) * 100).toFixed(1) + '% above strike'
+    : ((1 - S / K) * 100).toFixed(1) + '% below strike';
+  
+  // Show result
+  const rc = document.getElementById('resultCard');
+  rc.style.display = 'block';
+  
+  document.getElementById('resPrice').textContent = fmt$(result.price);
+  document.getElementById('resMoneyness').textContent = `${itm} | ${moneyness}`;
+  
+  const pnlEl = document.getElementById('resPnl');
+  pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt$(pnl, 0);
+  pnlEl.className = 'result-value ' + (pnl >= 0 ? 'green' : 'red');
+  
+  document.getElementById('resPnlPct').textContent = (pnlPct >= 0 ? '+' : '') + fmt(pnlPct, 1) + '%';
+  
+  document.getElementById('gDelta').textContent = fmt(result.delta, 3);
+  document.getElementById('gGamma').textContent = fmt(result.gamma, 5);
+  document.getElementById('gTheta').textContent = (result.theta >= 0 ? '+' : '') + fmt(result.theta, 2);
+  document.getElementById('gVega').textContent = '+' + fmt(result.vega, 2);
+  
+  document.getElementById('rd1').textContent = fmt(result.d1, 4);
+  document.getElementById('rd2').textContent = fmt(result.d2, 4);
+  document.getElementById('rnd1').textContent = fmt(normCDF(result.d1), 4);
+  document.getElementById('rnd2').textContent = fmt(normCDF(result.d2), 4);
+  document.getElementById('rdays').textContent = days + '天';
+  
+  // P&L bar
+  const pnlMarker = document.getElementById('pnlMarker');
+  const maxPnL = Math.max(Math.abs(pnl), cost * 2) * 1.5;
+  const pct = 50 + (pnl / maxPnL) * 45;
+  pnlMarker.style.left = Math.min(95, Math.max(5, pct)) + '%';
+  pnlMarker.setAttribute('data-val', (pnl >= 0 ? '+' : '') + '$' + Math.round(pnl));
+  document.getElementById('pnlRangeLabel').textContent = 
+    `成本 $${cost} → 盈亏区间 $${(cost - maxPnL/100*cost).toFixed(0)} ~ $${(cost + maxPnL/100*cost).toFixed(0)}`;
+  
+  // Advice
+  let advice = '';
+  if (optType === 'call' && direction === 'Short') {
+    if (result.delta > 0.7) advice = '⚠️ Delta > 0.7，高暴露！正股每涨$1，亏 ~$100。设止损线！';
+    else if (result.delta > 0.3) advice = '🟡 Delta中等，注意正股方向风险';
+    else advice = '✅ Delta < 0.3，相对安全，Theta持续流入';
+  } else if (optType === 'put' && direction === 'Long') {
+    if (K > S * 1.05) advice = '🟡 深度ITM Put，Delta偏低但有效对冲';
+    else if (K < S * 0.95) advice = '🔴 OTM Put，Theta损耗大，仅作保险';
+    else advice = '✅ 接近ATM的Put，Delta适中';
+  } else if (direction === 'Long') {
+    if (result.theta < -5) advice = `⏰ Theta亏损 $${Math.abs(result.theta).toFixed(1)}/天，注意时间损耗`;
+    else advice = '✅ Theta损耗可控';
+  } else {
+    advice = `💰 Short方，每日Theta收入约 $${Math.abs(result.theta).toFixed(1)}/天`;
+  }
+  document.getElementById('resAdvice').textContent = advice;
+  
+  // Sensitivity table
+  buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost);
+}
+
+function buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost) {
+  const sc = document.getElementById('sensCard');
+  sc.style.display = 'block';
+  
+  const tbody = document.querySelector('#sensTable tbody');
+  tbody.innerHTML = '';
+  
+  const pricePoints = [
+    { v: S * 0.80, label: '-20%' },
+    { v: S * 0.88, label: '-12%' },
+    { v: S * 0.94, label: '-6%' },
+    { v: S * 0.97, label: '-3%' },
+    { v: S * 1.00, label: '=现价' },
+    { v: S * 1.03, label: '+3%' },
+    { v: S * 1.06, label: '+6%' },
+    { v: S * 1.10, label: '+10%' },
+    { v: S * 1.15, label: '+15%' },
+    { v: S * 1.20, label: '+20%' },
+    { v: K, label: '=Strike' },
+  ];
+  
+  // Sort by price
+  pricePoints.sort((a, b) => a.v - b.v);
+  
+  const qty = direction === 'Long' ? 1 : -1;
+  
+  pricePoints.forEach(pt => {
+    const r = blackScholes(pt.v, K, T, r, sigma, optType);
+    const pnl = (r.price - cost) * qty * 100;
+    const isHighlight = Math.abs(pt.v - S) < S * 0.02;
+    const isStrike = Math.abs(pt.v - K) < 0.5;
+    
+    let status = '';
+    if (optType === 'call') {
+      status = pt.v > K ? (r.price > 0 ? 'ITM' : 'ATM') : 'OTM';
+    } else {
+      status = pt.v < K ? (r.price > 0 ? 'ITM' : 'ATM') : 'OTM';
+    }
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="${isHighlight ? 'highlight' : ''}">${fmt(pt.v)} <small>(${pt.label})</small></td>
+      <td class="${isStrike ? 'highlight' : ''}">${fmt$(r.price)}</td>
+      <td class="${pnl >= 0 ? 'green' : 'red'}" style="color: ${pnl >= 0 ? 'var(--green)' : 'var(--red)'}">${pnl >= 0 ? '+' : ''}$${Math.round(pnl).toLocaleString()}</td>
+      <td>${fmt(r.delta, 3)}</td>
+      <td>${status}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ========== Strategy calculations ==========
+function loadStrategy(name) {
+  document.querySelectorAll('.strategy-card').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  
+  // Default AMD-like setup
+  const S = parseFloat(document.getElementById('S2').value) || 424;
+  const IV = (parseFloat(document.getElementById('sigma2').value) || 52) / 100;
+  const T = (parseFloat(document.getElementById('dte2').value) || 30) / 365;
+  const r = 0.045;
+  
+  let legs = [];
+  let strategyName = name;
+  
+  if (name === 'longCall') {
+    legs = [{ type: 'call', dir: 1, strike: Math.round(S * 1.02) }];
+  } else if (name === 'shortPut') {
+    legs = [{ type: 'put', dir: -1, strike: Math.round(S * 0.95) }];
+  } else if (name === 'coveredCall') {
+    legs = [{ type: 'call', dir: -1, strike: Math.round(S * 1.05) }]; // assume stock owned
+  } else if (name === 'bullCall') {
+    legs = [
+      { type: 'call', dir: 1, strike: Math.round(S) },
+      { type: 'call', dir: -1, strike: Math.round(S * 1.1) }
+    ];
+  } else if (name === 'protectivePut') {
+    legs = [{ type: 'put', dir: 1, strike: Math.round(S * 0.95) }];
+  } else if (name === 'ironCondor') {
+    legs = [
+      { type: 'put', dir: -1, strike: Math.round(S * 0.9) },
+      { type: 'put', dir: 1, strike: Math.round(S * 0.95) },
+      { type: 'call', dir: -1, strike: Math.round(S * 1.05) },
+      { type: 'call', dir: 1, strike: Math.round(S * 1.1) }
+    ];
+  }
+  
+  window._strLegs = legs;
+  window._strS = S;
+  window._strIV = IV;
+  window._strT = T;
+  window._strR = r;
+}
+
+function calcStrategy() {
+  const legs = window._strLegs || [];
+  const S = parseFloat(document.getElementById('S2').value) || 424;
+  const IV = (parseFloat(document.getElementById('sigma2').value) || 52) / 100;
+  const T = (parseFloat(document.getElementById('dte2').value) || 30) / 365;
+  const r = 0.045;
+  
+  if (legs.length === 0) { alert('请先选择一个策略'); return; }
+  
+  // Calculate net cost/credit
+  let netCredit = 0;
+  legs.forEach(leg => {
+    const p = blackScholes(S, leg.strike, T, r, IV, leg.type).price;
+    netCredit += leg.dir * p;
+  });
+  netCredit *= 100; // per contract
+  
+  // Build P&L table
+  const priceRange = [];
+  for (let i = 0; i <= 20; i++) {
+    priceRange.push(S * (0.7 + i * 0.03));
+  }
+  
+  const tbody = document.getElementById('strTableBody');
+  tbody.innerHTML = '';
+  
+  let maxProfit = -Infinity, maxLoss = Infinity;
+  let breakEvenPoints = [];
+  
+  priceRange.forEach(p => {
+    let pnl = 0;
+    legs.forEach(leg => {
+      const opt = blackScholes(p, leg.strike, T, r, IV, leg.type).price;
+      pnl += leg.dir * (opt - (leg.dir > 0 ? 0 : 0)) * 100;
+    });
+    pnl -= netCredit; // subtract cost / add credit
+    
+    maxProfit = Math.max(maxProfit, pnl);
+    maxLoss = Math.min(maxLoss, pnl);
+    
+    const pct = netCredit !== 0 ? (pnl / Math.abs(netCredit) * 100).toFixed(0) + '%' : '--';
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${fmt(p)}</td><td style="color:${pnl>=0?'var(--green)':'var(--red)'}">${pnl>=0?'+':''}$${Math.round(pnl).toLocaleString()}</td><td>${pct}</td>`;
+    tbody.appendChild(row);
+  });
+  
+  document.getElementById('strMaxProfit').textContent = maxProfit >= 0 ? '+' + fmt$(maxProfit, 0) : fmt$(maxProfit, 0);
+  document.getElementById('strMaxLoss').textContent = fmt$(maxLoss, 0);
+  const ratio = Math.abs(maxProfit / maxLoss);
+  document.getElementById('strRatio').textContent = ratio >= 0 ? ratio.toFixed(2) + ':1' : '--';
+  document.getElementById('strBep').textContent = netCredit !== 0 ? fmt$(Math.abs(netCredit), 0) + (netCredit > 0 ? ' (收入)' : ' (支出)') : '--';
+  
+  document.getElementById('strategyResult').style.display = 'block';
+}
+
+// ========== Sensitivity matrix ==========
+function calcSensitivity() {
+  const S = parseFloat(document.getElementById('S3').value);
+  const K = parseFloat(document.getElementById('K3').value);
+  const IV = parseFloat(document.getElementById('sigma3').value) / 100;
+  const DTE = parseFloat(document.getElementById('dte3').value);
+  const T = DTE / 365;
+  const r = 0.045;
+  const optType = document.getElementById('optType3').value;
+  const direction = document.getElementById('direction3').value;
+  const cost = parseFloat(document.getElementById('cost3').value);
+  
+  const qty = direction === 'Long' ? 1 : -1;
+  
+  // Price range: -30% to +30%
+  const priceRange = [];
+  for (let i = -30; i <= 30; i += 5) {
+    priceRange.push(S * (1 + i / 100));
+  }
+  // IV range: 20% to 80%
+  const ivRange = [0.20, 0.28, 0.35, 0.42, 0.52, 0.60, 0.70, 0.80];
+  
+  function buildMatrix(data, fmtFn, unit) {
+    let html = '<table class="sens-table"><thead><tr><th>价↓ / IV→</th>';
+    ivRange.forEach(iv => html += `<th>${Math.round(iv*100)}%</th>`);
+    html += '</tr></thead><tbody>';
+    
+    priceRange.forEach(p => {
+      const pctChange = ((p - S) / S * 100).toFixed(0);
+      const color = p > S ? '+' : p < S ? '' : '';
+      html += `<tr><td>${fmt(p)} (${color}${pctChange}%)</td>`;
+      ivRange.forEach(iv => {
+        const val = data(p, iv);
+        const fmtd = fmtFn(val);
+        html += `<td>${fmtd}${unit}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+  
+  // Price matrix
+  document.getElementById('sensMatrix').innerHTML = buildMatrix(
+    (p, iv) => blackScholes(p, K, T, r, iv, optType).price * qty * 100,
+    (v) => v >= 0 ? '<span style="color:var(--green)">+' + v.toFixed(0) + '</span>' : '<span style="color:var(--red)">' + v.toFixed(0) + '</span>',
+    ''
+  );
+  
+  // P&L matrix
+  document.getElementById('sensPnlMatrix').innerHTML = buildMatrix(
+    (p, iv) => {
+      const optPrice = blackScholes(p, K, T, r, iv, optType).price;
+      return (optPrice - cost) * qty * 100;
+    },
+    (v) => v >= 0 ? '<span style="color:var(--green)">+' + v.toFixed(0) + '</span>' : '<span style="color:var(--red)">' + v.toFixed(0) + '</span>',
+    ''
+  );
+  
+  document.getElementById('sensResult').style.display = 'block';
+}
+
+// Auto-calculate on load
+window.onload = () => {
+  applyTickerPreset();
+};
+</script>
+</body>
+</html>
