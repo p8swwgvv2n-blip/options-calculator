@@ -628,7 +628,7 @@
       <div class="info-box" id="resAdvice">
         输入参数后点击计算
       </div>
-      <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" style="background:linear-gradient(135deg,#238636,#2ea043);margin-top:10px;display:none;font-size:1.1em;padding:12px 0;">💾 保存到持仓簿</button>
+      <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" disabled style="background:linear-gradient(135deg,#238636,#2ea043);margin-top:10px;font-size:1.1em;padding:12px 0;opacity:0.4;cursor:not-allowed;">💾 保存到持仓簿</button>
     </div>
     
     <!-- 敏感性分析表 -->
@@ -939,7 +939,9 @@ function calcStock() {
     : `📉 做空${qty}股，每跌$1赚$${qty}，每涨$1亏$${qty}`;
   
   document.getElementById('sensCard').style.display = 'none';
-  document.getElementById('saveBtn').style.display = 'block';
+  document.getElementById('saveBtn').disabled = false;
+  document.getElementById('saveBtn').style.opacity = '1';
+  document.getElementById('saveBtn').style.cursor = 'pointer';
 }
 
 // ========== Tab switching ==========
@@ -1076,7 +1078,9 @@ function calculate() {
   buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost);
   
   // Show save button
-  document.getElementById('saveBtn').style.display = 'block';
+  document.getElementById('saveBtn').disabled = false;
+  document.getElementById('saveBtn').style.opacity = '1';
+  document.getElementById('saveBtn').style.cursor = 'pointer';
 }
 
 function buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost) {
