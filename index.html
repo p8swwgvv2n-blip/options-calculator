@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>期权定价计算器</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>期权定价计算器 v2.0</title>
 <style>
   :root {
     --bg: #0f1419;
@@ -628,7 +631,7 @@
       <div class="info-box" id="resAdvice">
         输入参数后点击计算
       </div>
-      <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" disabled style="background:linear-gradient(135deg,#238636,#2ea043);margin-top:10px;font-size:1.1em;padding:12px 0;opacity:0.4;cursor:not-allowed;">💾 保存到持仓簿</button>
+      <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" disabled style="background:linear-gradient(135deg,#238636,#2ea043);margin-top:10px;font-size:1.1em;padding:12px 0;opacity:0.5;cursor:not-allowed;">💾 保存到持仓簿 (请先计算)</button>
     </div>
     
     <!-- 敏感性分析表 -->
@@ -939,9 +942,11 @@ function calcStock() {
     : `📉 做空${qty}股，每跌$1赚$${qty}，每涨$1亏$${qty}`;
   
   document.getElementById('sensCard').style.display = 'none';
-  document.getElementById('saveBtn').disabled = false;
-  document.getElementById('saveBtn').style.opacity = '1';
-  document.getElementById('saveBtn').style.cursor = 'pointer';
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.style.cursor = 'pointer';
+  btn.textContent = '💾 保存到持仓簿';
 }
 
 // ========== Tab switching ==========
@@ -1078,10 +1083,12 @@ function calculate() {
   buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost);
   
   // Show save button
-  alert('计算完成，启用保存按钮');
-  document.getElementById('saveBtn').disabled = false;
-  document.getElementById('saveBtn').style.opacity = '1';
-  document.getElementById('saveBtn').style.cursor = 'pointer';
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.style.cursor = 'pointer';
+  btn.textContent = '💾 保存到持仓簿';
+  alert('✅ 计算完成！保存按钮已启用，请点击保存');
 }
 
 function buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost) {
