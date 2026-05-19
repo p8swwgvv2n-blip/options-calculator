@@ -154,6 +154,38 @@
   .quick-btn:hover { border-color: var(--blue); color: var(--blue); }
   .quick-btn.active { border-color: var(--green); color: var(--green); }
   
+  /* Live data button */
+  .live-btn {
+    padding: 6px 14px;
+    background: linear-gradient(135deg, #238636, #2ea043);
+    border: 1px solid #2ea043;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.8em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .live-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .live-btn:disabled { opacity: 0.5; cursor: wait; }
+  .live-btn.loading { background: linear-gradient(135deg, #d29922, #e3b341); border-color: #e3b341; }
+  .live-btn.error { background: linear-gradient(135deg, #da3633, #f85149); border-color: #f85149; }
+  .live-status {
+    font-size: 0.7em;
+    color: var(--muted);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); display: inline-block; }
+  .live-dot.ok { background: var(--green); }
+  .live-dot.err { background: var(--red); }
+  .live-dot.loading { background: var(--yellow); }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  .live-dot.loading { animation: blink 1s infinite; }
+  
   /* Results */
   .result-grid {
     display: grid;
@@ -394,6 +426,12 @@
           <option value="META">META</option>
           <option value="CUSTOM">自定义</option>
         </select>
+        <button class="live-btn" id="liveBtn" onclick="fetchLiveData()">📡 获取实时数据</button>
+      </div>
+      
+      <div class="live-status" id="liveStatus">
+        <span class="live-dot" id="liveDot"></span>
+        <span id="liveMsg">点击按钮获取实时股价</span>
       </div>
       
       <div class="input-row">
@@ -1077,6 +1115,105 @@ function calcSensitivity() {
   );
   
   document.getElementById('sensResult').style.display = 'block';
+}
+
+// ========== Fetch Live Data ==========
+const LIVE_SOURCES = [
+  {
+    name: 'stockanalysis',
+    url: (t) => `https://stockanalysis.com/stocks/${t.toLowerCase()}/`,
+    api: (t) => `https://stockanalysis.com/api/symbol/s/${t.toLowerCase()}/overview`,
+    parse: async (t) => {
+      const res = await fetch(`https://stockanalysis.com/api/symbol/s/${t.toLowerCase()}/overview`);
+      const d = await res.json();
+      return { price: d.data?.close ?? d.data?.price, iv: null };
+    }
+  },
+  {
+    name: 'yahoo-proxy',
+    parse: async (t) => {
+      // Use Yahoo Finance v8 API via allorigins proxy
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${t}?interval=1d&range=1d`;
+      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy);
+      const d = await res.json();
+      const meta = d.chart?.result?.[0]?.meta;
+      return { price: meta?.regularMarketPrice, iv: null };
+    }
+  },
+  {
+    name: 'finnhub',
+    parse: async (t) => {
+      const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${t}&token=demo`);
+      const d = await res.json();
+      return { price: d.c, iv: null };
+    }
+  }
+];
+
+async function fetchLiveData() {
+  const ticker = document.getElementById('ticker').value;
+  if (ticker === 'CUSTOM') {
+    alert('请选择具体标的后再获取实时数据');
+    return;
+  }
+  
+  const btn = document.getElementById('liveBtn');
+  const dot = document.getElementById('liveDot');
+  const msg = document.getElementById('liveMsg');
+  
+  btn.disabled = true;
+  btn.className = 'live-btn loading';
+  btn.textContent = '⏳ 获取中...';
+  dot.className = 'live-dot loading';
+  msg.textContent = `正在获取 ${ticker} 实时数据...`;
+  
+  let price = null, ivEstimate = null;
+  let sourceName = '';
+  
+  for (const src of LIVE_SOURCES) {
+    try {
+      const result = await src.parse(ticker);
+      if (result.price && result.price > 0) {
+        price = result.price;
+        ivEstimate = result.iv;
+        sourceName = src.name;
+        break;
+      }
+    } catch(e) {
+      console.log(`${src.name} failed:`, e.message);
+    }
+  }
+  
+  btn.disabled = false;
+  
+  if (price) {
+    // Update stock price
+    document.getElementById('S').value = price.toFixed(2);
+    
+    // Update IV if available, otherwise try to estimate from presets
+    if (ivEstimate && ivEstimate > 0) {
+      document.getElementById('sigma').value = ivEstimate.toFixed(1);
+    }
+    // Presets already have reasonable IV defaults
+    
+    btn.className = 'live-btn';
+    btn.textContent = '📡 获取实时数据';
+    dot.className = 'live-dot ok';
+    msg.textContent = `✅ ${ticker} $${price.toFixed(2)} (来源: ${sourceName}) ${new Date().toLocaleTimeString()}`;
+    
+    // Auto-calculate with new price
+    calculate();
+  } else {
+    btn.className = 'live-btn error';
+    btn.textContent = '📡 重试';
+    dot.className = 'live-dot err';
+    msg.textContent = `❌ 获取失败，所有数据源不可用。请手动输入股价。`;
+    setTimeout(() => {
+      btn.className = 'live-btn';
+      btn.textContent = '📡 获取实时数据';
+    }, 3000);
+  }
 }
 
 // Auto-calculate on load
