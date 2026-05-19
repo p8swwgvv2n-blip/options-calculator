@@ -631,8 +631,11 @@
       <div class="info-box" id="resAdvice">
         输入参数后点击计算
       </div>
-      <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" disabled style="background:linear-gradient(135deg,#238636,#2ea043);margin-top:10px;font-size:1.1em;padding:12px 0;opacity:0.5;cursor:not-allowed;">💾 保存到持仓簿 (请先计算)</button>
     </div>
+    
+    <!-- 保存按钮 - 独立于resultCard，始终可见 -->
+    <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" style="background:linear-gradient(135deg,#238636,#2ea043);margin-top:12px;font-size:1em;padding:12px 0;">💾 保存到持仓簿</button>
+    <div id="saveMsg" style="text-align:center;font-size:0.8em;color:var(--muted);margin-top:4px;">请先点「计算」，然后再保存</div>
     
     <!-- 敏感性分析表 -->
     <div class="card" id="sensCard" style="display:none;">
@@ -942,11 +945,9 @@ function calcStock() {
     : `📉 做空${qty}股，每跌$1赚$${qty}，每涨$1亏$${qty}`;
   
   document.getElementById('sensCard').style.display = 'none';
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = false;
-  btn.style.opacity = '1';
-  btn.style.cursor = 'pointer';
-  btn.textContent = '💾 保存到持仓簿';
+  window._hasCalculated = true;
+  document.getElementById('saveMsg').textContent = '✅ 已计算，可以保存';
+  document.getElementById('saveMsg').style.color = 'var(--green)';
 }
 
 // ========== Tab switching ==========
@@ -1082,13 +1083,10 @@ function calculate() {
   // Sensitivity table
   buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost);
   
-  // Show save button
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = false;
-  btn.style.opacity = '1';
-  btn.style.cursor = 'pointer';
-  btn.textContent = '💾 保存到持仓簿';
-  alert('✅ 计算完成！保存按钮已启用，请点击保存');
+  // Mark as calculated
+  window._hasCalculated = true;
+  document.getElementById('saveMsg').textContent = '✅ 已计算，可以保存';
+  document.getElementById('saveMsg').style.color = 'var(--green)';
 }
 
 function buildSensitivityTable(S, K, T, r, sigma, optType, direction, cost) {
@@ -1313,7 +1311,11 @@ function setPositions(arr) {
 }
 
 function saveToPortfolio() {
-  alert('保存中...');
+  if (!window._hasCalculated) {
+    document.getElementById('saveMsg').textContent = '⚠️ 请先点「计算」再保存';
+    document.getElementById('saveMsg').style.color = 'var(--red)';
+    return;
+  }
   const assetType = document.getElementById('assetType').value;
   const ticker = document.getElementById('ticker').value;
   const S = parseFloat(document.getElementById('S').value);
@@ -1357,9 +1359,15 @@ function saveToPortfolio() {
   setPositions(positions);
   
   const btn = document.getElementById('saveBtn');
+  const msg = document.getElementById('saveMsg');
   btn.textContent = '✅ 已保存!';
   btn.style.background = 'var(--blue)';
-  setTimeout(() => { btn.textContent = '💾 保存到持仓簿'; btn.style.background = 'var(--green)'; }, 1500);
+  msg.textContent = '✅ 已保存到持仓簿，切换到「持仓簿」查看';
+  msg.style.color = 'var(--blue)';
+  setTimeout(() => {
+    btn.textContent = '💾 保存到持仓簿';
+    btn.style.background = 'linear-gradient(135deg,#238636,#2ea043)';
+  }, 2000);
 }
 
 function deletePosition(id) {
@@ -1716,6 +1724,7 @@ async function fetchLiveData() {
 
 // Auto-calculate on load
 window.onload = () => {
+  window._hasCalculated = false;
   applyTickerPreset();
   renderPositions();
 };
