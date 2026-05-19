@@ -477,19 +477,44 @@
       </div>
       
       <div class="input-row">
-        <label>期权类型</label>
-        <select id="optType">
-          <option value="call">Call (看涨)</option>
-          <option value="put">Put (看跌)</option>
+        <label>资产类型</label>
+        <select id="assetType" onchange="toggleAssetType()">
+          <option value="option">期权 Option</option>
+          <option value="stock">正股 Stock</option>
         </select>
       </div>
       
-      <div class="input-row">
-        <label>方向</label>
-        <select id="direction">
-          <option value="Long">Long (买入)</option>
-          <option value="Short">Short (卖出)</option>
-        </select>
+      <div id="optionFields">
+        <div class="input-row">
+          <label>期权类型</label>
+          <select id="optType">
+            <option value="call">Call (看涨)</option>
+            <option value="put">Put (看跌)</option>
+          </select>
+        </div>
+        
+        <div class="input-row">
+          <label>方向</label>
+          <select id="direction">
+            <option value="Long">Long (买入)</option>
+            <option value="Short">Short (卖出)</option>
+          </select>
+        </div>
+      </div>
+      
+      <div id="stockFields" style="display:none;">
+        <div class="input-row">
+          <label>方向</label>
+          <select id="stockDir">
+            <option value="Long">Long (持有)</option>
+            <option value="Short">Short (做空)</option>
+          </select>
+        </div>
+        <div class="input-row">
+          <label>持股数量</label>
+          <input type="number" id="stockQty" value="100" step="1" min="1">
+          <span class="unit">股</span>
+        </div>
       </div>
       
       <div class="input-row">
@@ -498,24 +523,24 @@
         <span class="unit">USD</span>
       </div>
       
-      <div class="input-row">
+      <div class="input-row" id="rowK">
         <label>Strike</label>
         <input type="number" id="K" value="400" step="1" min="0">
         <span class="unit">USD</span>
       </div>
       
-      <div class="input-row">
+      <div class="input-row" id="rowExp">
         <label>到期日</label>
         <input type="date" id="expDate" value="2027-01-15">
       </div>
       
-      <div class="input-row">
+      <div class="input-row" id="rowIV">
         <label>IV (隐含波动率)</label>
         <input type="number" id="sigma" value="52" step="0.1" min="0" max="200">
         <span class="unit">%</span>
       </div>
       
-      <div class="input-row">
+      <div class="input-row" id="rowR">
         <label>无风险利率</label>
         <input type="number" id="r" value="4.5" step="0.1" min="0" max="20">
         <span class="unit">%</span>
@@ -524,7 +549,7 @@
       <div class="input-row">
         <label>你的成本价</label>
         <input type="number" id="cost" value="10" step="0.01" min="0">
-        <span class="unit">USD</span>
+        <span class="unit">USD/股</span>
       </div>
       
       <div class="card-title" style="margin-top: 16px;">⚡ 快速设置（正股心理价位）</div>
@@ -603,7 +628,7 @@
       <div class="info-box" id="resAdvice">
         输入参数后点击计算
       </div>
-      <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" style="background:var(--green);margin-top:8px;display:none;">💾 保存到持仓簿</button>
+      <button class="btn-calc" id="saveBtn" onclick="saveToPortfolio()" style="background:linear-gradient(135deg,#238636,#2ea043);margin-top:10px;display:none;font-size:1.1em;padding:12px 0;">💾 保存到持仓簿</button>
     </div>
     
     <!-- 敏感性分析表 -->
@@ -852,6 +877,70 @@ function getT(expDate) {
 
 function fmt(n, d = 2) { return typeof n === 'number' ? n.toFixed(d) : '--'; }
 function fmt$(n, d = 2) { return '$' + fmt(n, d); }
+
+// ========== Asset type toggle ==========
+function toggleAssetType() {
+  const isStock = document.getElementById('assetType').value === 'stock';
+  document.getElementById('optionFields').style.display = isStock ? 'none' : 'block';
+  document.getElementById('stockFields').style.display = isStock ? 'block' : 'none';
+  document.getElementById('rowK').style.display = isStock ? 'none' : 'flex';
+  document.getElementById('rowExp').style.display = isStock ? 'none' : 'flex';
+  document.getElementById('rowIV').style.display = isStock ? 'none' : 'flex';
+  document.getElementById('rowR').style.display = isStock ? 'none' : 'flex';
+  if (!isStock) calculate();
+  else calcStock();
+}
+
+function calcStock() {
+  const S = parseFloat(document.getElementById('S').value);
+  const cost = parseFloat(document.getElementById('cost').value);
+  const qty = parseInt(document.getElementById('stockQty').value) || 100;
+  const dir = document.getElementById('stockDir').value;
+  const dirMul = dir === 'Long' ? 1 : -1;
+  const ticker = document.getElementById('ticker').value;
+  
+  const mktVal = S * qty;
+  const costVal = cost * qty;
+  const pnl = (S - cost) * dirMul * qty;
+  const pnlPct = cost > 0 ? (S - cost) / cost * 100 * dirMul : 0;
+  
+  // Stock delta = ±1 per share
+  const totalDelta = dirMul * qty / 100; // per 100 shares = 1 option contract equivalent
+  
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('resPrice').textContent = '$' + S.toFixed(2);
+  document.getElementById('resMoneyness').textContent = `${dir} ${qty}股 | 市值 $${mktVal.toFixed(0)}`;
+  
+  const pnlEl = document.getElementById('resPnl');
+  pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + Math.round(pnl).toLocaleString();
+  pnlEl.className = 'result-value ' + (pnl >= 0 ? 'green' : 'red');
+  document.getElementById('resPnlPct').textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(1) + '%';
+  
+  document.getElementById('gDelta').textContent = totalDelta.toFixed(2) + '/合约';
+  document.getElementById('gGamma').textContent = '0';
+  document.getElementById('gTheta').textContent = '0';
+  document.getElementById('gVega').textContent = '0';
+  
+  document.getElementById('rd1').textContent = 'N/A';
+  document.getElementById('rd2').textContent = 'N/A';
+  document.getElementById('rnd1').textContent = '1.0';
+  document.getElementById('rnd2').textContent = '1.0';
+  document.getElementById('rdays').textContent = '永续';
+  
+  const pnlMarker = document.getElementById('pnlMarker');
+  const maxPnL = Math.max(Math.abs(pnl), costVal) * 1.5;
+  const pct = 50 + (pnl / maxPnL) * 45;
+  pnlMarker.style.left = Math.min(95, Math.max(5, pct)) + '%';
+  pnlMarker.setAttribute('data-val', (pnl >= 0 ? '+' : '') + '$' + Math.round(pnl));
+  document.getElementById('pnlRangeLabel').textContent = `成本 $${cost}/股 × ${qty}股 = $${costVal.toFixed(0)}`;
+  
+  document.getElementById('resAdvice').textContent = dir === 'Long' 
+    ? `📈 持有${qty}股，每涨$1赚$${qty}，每跌$1亏$${qty}`
+    : `📉 做空${qty}股，每跌$1赚$${qty}，每涨$1亏$${qty}`;
+  
+  document.getElementById('sensCard').style.display = 'none';
+  document.getElementById('saveBtn').style.display = 'block';
+}
 
 // ========== Tab switching ==========
 document.querySelectorAll('.tab').forEach(t => {
@@ -1212,32 +1301,48 @@ function setPositions(arr) {
 }
 
 function saveToPortfolio() {
-  const S = parseFloat(document.getElementById('S').value);
-  const K = parseFloat(document.getElementById('K').value);
-  const sigma = parseFloat(document.getElementById('sigma').value);
-  const r = parseFloat(document.getElementById('r').value);
-  const cost = parseFloat(document.getElementById('cost').value);
-  const optType = document.getElementById('optType').value;
-  const direction = document.getElementById('direction').value;
-  const expDate = document.getElementById('expDate').value;
+  const assetType = document.getElementById('assetType').value;
   const ticker = document.getElementById('ticker').value;
-  const qty = direction === 'Long' ? 1 : -1;
-  const T = getT(expDate);
-  const result = blackScholes(S, K, T, r/100, sigma/100, optType);
-  const pnl = (result.price - cost) * qty * 100;
-
-  const pos = {
-    id: Date.now(),
-    ticker, optType, direction, S, K, expDate, sigma, r, cost,
-    curPrice: result.price, delta: result.delta, gamma: result.gamma,
-    theta: result.theta, vega: result.vega, pnl,
-    savedAt: new Date().toLocaleString()
-  };
+  const S = parseFloat(document.getElementById('S').value);
+  const cost = parseFloat(document.getElementById('cost').value);
+  
+  let pos;
+  if (assetType === 'stock') {
+    const qty = parseInt(document.getElementById('stockQty').value) || 100;
+    const dir = document.getElementById('stockDir').value;
+    const dirMul = dir === 'Long' ? 1 : -1;
+    pos = {
+      id: Date.now(),
+      assetType: 'stock',
+      ticker, direction: dir, S, cost, stockQty: qty,
+      curPrice: S, delta: dirMul * qty / 100, gamma: 0, theta: 0, vega: 0,
+      pnl: (S - cost) * dirMul * qty,
+      savedAt: new Date().toLocaleString()
+    };
+  } else {
+    const K = parseFloat(document.getElementById('K').value);
+    const sigma = parseFloat(document.getElementById('sigma').value);
+    const r = parseFloat(document.getElementById('r').value);
+    const optType = document.getElementById('optType').value;
+    const direction = document.getElementById('direction').value;
+    const expDate = document.getElementById('expDate').value;
+    const qty = direction === 'Long' ? 1 : -1;
+    const T = getT(expDate);
+    const result = blackScholes(S, K, T, r/100, sigma/100, optType);
+    const pnl = (result.price - cost) * qty * 100;
+    pos = {
+      id: Date.now(),
+      assetType: 'option',
+      ticker, optType, direction, S, K, expDate, sigma, r, cost,
+      curPrice: result.price, delta: result.delta, gamma: result.gamma,
+      theta: result.theta, vega: result.vega, pnl,
+      savedAt: new Date().toLocaleString()
+    };
+  }
   const positions = getPositions();
   positions.push(pos);
   setPositions(positions);
   
-  // Flash the save button
   const btn = document.getElementById('saveBtn');
   btn.textContent = '✅ 已保存!';
   btn.style.background = 'var(--blue)';
@@ -1265,17 +1370,32 @@ function renderPositions() {
   positions.forEach(p => {
     const pnlColor = p.pnl >= 0 ? 'var(--green)' : 'var(--red)';
     const pnlStr = (p.pnl >= 0 ? '+' : '') + '$' + Math.round(p.pnl).toLocaleString();
-    const typeTag = `<span class="pos-tag ${p.optType}">${p.optType.toUpperCase()}</span>`;
-    const dirTag = `<span class="pos-tag ${p.direction.toLowerCase()}">${p.direction}</span>`;
-    html += `<div class="pos-card">
-      <div class="pos-info">
-        <div class="pos-title">${typeTag} ${dirTag} ${p.ticker} $${p.K} ${p.expDate}</div>
-        <div class="pos-detail">S=$${p.S.toFixed(2)} | IV=${p.sigma}% | 成本=$${p.cost} | 现价=$${p.curPrice?.toFixed(2) || '--'} | Δ=${p.delta?.toFixed(3) || '--'}</div>
-        <div class="pos-detail">${p.savedAt}</div>
-      </div>
-      <div class="pos-pnl" style="color:${pnlColor}">${pnlStr}</div>
-      <span class="pos-del" onclick="deletePosition(${p.id})">✕</span>
-    </div>`;
+    
+    if (p.assetType === 'stock') {
+      const dirTag = `<span class="pos-tag ${p.direction.toLowerCase()}">${p.direction}</span>`;
+      const stockTag = `<span class="pos-tag" style="background:rgba(188,140,255,0.15);color:var(--purple)">STOCK</span>`;
+      html += `<div class="pos-card">
+        <div class="pos-info">
+          <div class="pos-title">${stockTag} ${dirTag} ${p.ticker} × ${p.stockQty}股</div>
+          <div class="pos-detail">S=$${p.S.toFixed(2)} | 成本=$${p.cost}/股 | Δ=${p.delta?.toFixed(2) || '--'}/合约</div>
+          <div class="pos-detail">${p.savedAt}</div>
+        </div>
+        <div class="pos-pnl" style="color:${pnlColor}">${pnlStr}</div>
+        <span class="pos-del" onclick="deletePosition(${p.id})">✕</span>
+      </div>`;
+    } else {
+      const typeTag = `<span class="pos-tag ${p.optType}">${p.optType.toUpperCase()}</span>`;
+      const dirTag = `<span class="pos-tag ${p.direction.toLowerCase()}">${p.direction}</span>`;
+      html += `<div class="pos-card">
+        <div class="pos-info">
+          <div class="pos-title">${typeTag} ${dirTag} ${p.ticker} $${p.K} ${p.expDate}</div>
+          <div class="pos-detail">S=$${p.S.toFixed(2)} | IV=${p.sigma}% | 成本=$${p.cost} | 现价=$${p.curPrice?.toFixed(2) || '--'} | Δ=${p.delta?.toFixed(3) || '--'}</div>
+          <div class="pos-detail">${p.savedAt}</div>
+        </div>
+        <div class="pos-pnl" style="color:${pnlColor}">${pnlStr}</div>
+        <span class="pos-del" onclick="deletePosition(${p.id})">✕</span>
+      </div>`;
+    }
   });
   list.innerHTML = html;
   
@@ -1289,13 +1409,23 @@ function renderCombined(positions) {
   // Aggregate Greeks and P&L
   let totalCost = 0, totalPnl = 0, totalDelta = 0, totalGamma = 0, totalTheta = 0, totalVega = 0;
   positions.forEach(p => {
-    const qty = p.direction === 'Long' ? 1 : -1;
-    totalCost += p.cost * qty * 100; // negative for short = credit
-    totalPnl += p.pnl;
-    totalDelta += (p.delta || 0) * qty;
-    totalGamma += (p.gamma || 0) * qty;
-    totalTheta += (p.theta || 0) * qty;
-    totalVega += (p.vega || 0) * qty;
+    if (p.assetType === 'stock') {
+      const dirMul = p.direction === 'Long' ? 1 : -1;
+      totalCost += p.cost * dirMul * p.stockQty;
+      totalPnl += p.pnl;
+      totalDelta += p.delta || 0;
+      totalGamma += 0;
+      totalTheta += 0;
+      totalVega += 0;
+    } else {
+      const qty = p.direction === 'Long' ? 1 : -1;
+      totalCost += p.cost * qty * 100;
+      totalPnl += p.pnl;
+      totalDelta += (p.delta || 0) * qty;
+      totalGamma += (p.gamma || 0) * qty;
+      totalTheta += (p.theta || 0) * qty;
+      totalVega += (p.vega || 0) * qty;
+    }
   });
   
   document.getElementById('combCost').textContent = (totalCost >= 0 ? '-' : '+') + '$' + Math.abs(Math.round(totalCost)).toLocaleString();
@@ -1326,12 +1456,17 @@ function drawCombinedChart(positions) {
   const pnls = prices.map(p => {
     let total = 0;
     positions.forEach(pos => {
-      const T = getT(pos.expDate);
-      const r = pos.r / 100;
-      const sigma = pos.sigma / 100;
-      const result = blackScholes(p, pos.K, T, r, sigma, pos.optType);
-      const qty = pos.direction === 'Long' ? 1 : -1;
-      total += (result.price - pos.cost) * qty * 100;
+      if (pos.assetType === 'stock') {
+        const dirMul = pos.direction === 'Long' ? 1 : -1;
+        total += (p - pos.cost) * dirMul * pos.stockQty;
+      } else {
+        const T = getT(pos.expDate);
+        const r = pos.r / 100;
+        const sigma = pos.sigma / 100;
+        const result = blackScholes(p, pos.K, T, r, sigma, pos.optType);
+        const qty = pos.direction === 'Long' ? 1 : -1;
+        total += (result.price - pos.cost) * qty * 100;
+      }
     });
     return total;
   });
